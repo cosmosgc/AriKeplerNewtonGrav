@@ -1,0 +1,677 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Newton & Kepler — Simulação Interativa</title>
+<style>
+  :root{
+    --bg:#0f1724;
+    --panel:#0b1220;
+    --accent:#7dd3fc;
+    --muted:#94a3b8;
+    --card:#0f1724cc;
+    --glass: rgba(255,255,255,0.04);
+  }
+
+  html,body{height:100%;margin:0;background:linear-gradient(180deg,#071029 0%, #071525 100%);color:#e6eef8;font-family:Inter,system-ui,Segoe UI,Roboto,"Helvetica Neue",Arial;}
+
+  .app {
+    display:flex;
+    flex-direction:row;
+    gap:16px;
+    padding:16px;
+    box-sizing:border-box;
+    min-height:100vh;
+  }
+
+  /* Left: controls (stack on mobile) */
+  .controls {
+    width:340px;
+    max-width:40%;
+    background:var(--panel);
+    border-radius:12px;
+    padding:12px;
+    box-shadow:0 6px 18px rgba(2,6,23,0.6);
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+  }
+
+  .control-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+  label{font-size:13px;color:var(--muted);min-width:120px;}
+  input[type="range"]{flex:1;}
+  input[type="number"], select{background:transparent;border:1px solid rgba(255,255,255,0.06);color:inherit;padding:6px;border-radius:6px;min-width:90px;}
+  .small {font-size:12px;color:var(--muted);}
+
+  .btns{display:flex;gap:8px;}
+  button{
+    background:linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));
+    border:1px solid rgba(255,255,255,0.06);
+    color:var(--accent);
+    padding:8px 12px;border-radius:8px;cursor:pointer;font-weight:600;
+  }
+  button.secondary{color:var(--muted);background:transparent;border:1px solid rgba(255,255,255,0.03);}
+
+  .legend{font-size:12px;color:var(--muted);margin-top:6px;}
+  .stat {display:flex;justify-content:space-between;font-size:13px;padding:6px 8px;background:var(--glass);border-radius:8px;}
+  .stat strong{color:var(--accent)}
+
+  /* Right: canvas area */
+  .viewer {
+    flex:1;
+    min-width:0;
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+  }
+  .stage {
+    background: radial-gradient(1200px 600px at 10% 10%, rgba(125,211,252,0.03), transparent 20%), linear-gradient(180deg, rgba(255,255,255,0.01), transparent);
+    border-radius:12px;
+    padding:12px;
+    flex:1;
+    display:flex;
+    flex-direction:column;
+  }
+  canvas{
+    width:100%;
+    height:100%;
+    border-radius:10px;
+    background:linear-gradient(180deg, rgba(2,6,23,0.6), rgba(3,7,20,0.8));
+    touch-action:none;
+  }
+
+  .footer {
+    display:flex;justify-content:space-between;align-items:center;gap:10px;
+  }
+
+  /* Responsive: mobile stacks */
+  @media (max-width:880px){
+    .app{flex-direction:column;padding:12px;}
+    .controls{width:100%;max-width:100%;}
+    .viewer{width:100%;}
+    label{min-width:100px;}
+  }
+
+  /* small helper */
+  .row {display:flex;gap:8px;align-items:center;}
+  .chip{font-size:12px;padding:6px 8px;border-radius:999px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.02)}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="controls" aria-label="Controles da simulação">
+    <h3 style="margin:0 0 6px 0">Newton & Kepler — Simulação</h3>
+    <div class="small">Ajuste variáveis abaixo e use os botões para controlar a simulação.</div>
+
+    <div class="control-row">
+      <label for="G">Constante G</label>
+      <input id="G" type="number" step="any" value="1" />
+      <div class="chip">units</div>
+    </div>
+
+    <div class="control-row">
+      <label for="mass1">Massa central (M)</label>
+      <input id="mass1" type="number" step="any" value="1000" />
+    </div>
+
+    <div class="control-row">
+      <label for="mass2">Massa corpo (m)</label>
+      <input id="mass2" type="number" step="any" value="1" />
+    </div>
+
+    <div class="control-row">
+      <label for="a">Semieixo maior (a)</label>
+      <input id="a" type="number" step="any" value="200" />
+    </div>
+
+    <div class="control-row">
+      <label for="ecc">Excentricidade (e)</label>
+      <input id="ecc" type="range" min="0" max="0.95" step="0.01" value="0.2">
+      <div style="width:44px;text-align:right" id="eccVal">0.20</div>
+    </div>
+
+    <div class="control-row">
+      <label for="theta0">Anomalia inicial (°)</label>
+      <input id="theta0" type="number" step="any" value="0" />
+    </div>
+
+    <div class="control-row">
+      <label for="dtRange">Passo dt (sim)</label>
+      <input id="dtRange" type="range" min="0.01" max="2" step="0.01" value="0.5">
+      <div style="width:40px;text-align:right" id="dtVal">0.50</div>
+    </div>
+
+    <div class="control-row">
+      <label for="trace">Traçado</label>
+      <select id="trace">
+        <option value="on">On</option>
+        <option value="fade">Fade</option>
+        <option value="off">Off</option>
+      </select>
+      <div class="chip" title="Zoom">pinch/touch to zoom</div>
+    </div>
+
+    <div class="btns" style="margin-top:6px;">
+      <button id="startBtn">Start</button>
+      <button id="pauseBtn" class="secondary">Pause</button>
+      <button id="resetBtn" class="secondary">Reset</button>
+    </div>
+
+    <div style="margin-top:8px" class="legend">
+      <div class="small">Legenda</div>
+      <div class="row" style="margin-top:6px;gap:10px;">
+        <div class="stat" style="flex:1"><span>Massa central</span><strong id="statM">1000</strong></div>
+        <div class="stat" style="flex:1"><span>Corpo</span><strong id="statm">1</strong></div>
+      </div>
+      <div style="height:6px"></div>
+      <div class="stat"><span>Força (instant)</span><strong id="statF">0</strong></div>
+      <div class="stat"><span>Velocidade</span><strong id="statV">0</strong></div>
+      <div class="stat"><span>Energy (E)</span><strong id="statE">0</strong></div>
+    </div>
+
+    <div style="margin-top:12px;font-size:12px;color:var(--muted)">
+      <strong>Notas rápidas</strong>
+      <ul style="padding-left:18px;margin:6px 0;">
+        <li>Newton: F = G·M·m / r² (direção radial)</li>
+        <li>Kepler 1: órbitas elípticas com foco no centro de massa</li>
+        <li>Kepler 2: áreas iguais em tempos iguais (áreas triangulares visualizadas)</li>
+        <li>Kepler 3: T² ∝ a³ — período calculado numericamente e analiticamente</li>
+      </ul>
+    </div>
+  </aside>
+
+  <main class="viewer">
+    <div class="stage">
+      <canvas id="simCanvas" width="1200" height="700" aria-label="Canvas da simulação"></canvas>
+      <div class="footer">
+        <div class="row small">
+          <div id="info1">t = 0.00</div>
+          <div id="info2">Area (last interval) = 0</div>
+        </div>
+        <div class="row">
+          <div class="small">Período numérico T ≈ <strong id="periodNum">—</strong></div>
+          <div style="width:12px"></div>
+          <div class="small">Período Kepler (analítico) ≈ <strong id="periodKepler">—</strong></div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+/*
+  Simulação interativa:
+  - Integração: Velocity Verlet (bom equilíbrio entre estabilidade e simplicidade)
+  - Unidades: arbitrárias (se quiser consistência física, usar G=6.674e-11 com metros/kg/s)
+  - Objetivo: mostrar forças, órbita elíptica, áreas iguais/tempos iguais, e relação T^2 ∝ a^3.
+*/
+
+/* ---------- Utilitários de vetor simples ---------- */
+function vec(x=0,y=0){return {x,y}}
+function add(a,b){return {x:a.x+b.x, y:a.y+b.y}}
+function sub(a,b){return {x:a.x-b.x, y:a.y-b.y}}
+function mul(a,s){return {x:a.x*s, y:a.y*s}}
+function len(v){return Math.hypot(v.x,v.y)}
+function norm(v){const L=len(v); return L?{x:v.x/L,y:v.y/L}:{x:0,y:0}}
+
+/* ---------- Elementos DOM ---------- */
+const canvas = document.getElementById('simCanvas');
+const ctx = canvas.getContext('2d', { alpha: false });
+const DPR = Math.max(1, window.devicePixelRatio || 1);
+function resizeCanvas(){
+  canvas.width = Math.floor(canvas.clientWidth * DPR);
+  canvas.height = Math.floor(canvas.clientHeight * DPR);
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+/* ---------- Controles ---------- */
+const Ginput = document.getElementById('G');
+const Minput = document.getElementById('mass1');
+const minput = document.getElementById('mass2');
+const aInput = document.getElementById('a');
+const ecc = document.getElementById('ecc');
+const eccVal = document.getElementById('eccVal');
+const theta0 = document.getElementById('theta0');
+const dtRange = document.getElementById('dtRange');
+const dtVal = document.getElementById('dtVal');
+const traceSel = document.getElementById('trace');
+
+const startBtn = document.getElementById('startBtn');
+const pauseBtn = document.getElementById('pauseBtn');
+const resetBtn = document.getElementById('resetBtn');
+
+const statM = document.getElementById('statM');
+const statm = document.getElementById('statm');
+const statF = document.getElementById('statF');
+const statV = document.getElementById('statV');
+const statE = document.getElementById('statE');
+
+const periodNum = document.getElementById('periodNum');
+const periodK = document.getElementById('periodKepler');
+const info1 = document.getElementById('info1');
+const info2 = document.getElementById('info2');
+
+/* ---------- Parâmetros e estado ---------- */
+let params = {
+  G: parseFloat(Ginput.value),
+  M: parseFloat(Minput.value),
+  m: parseFloat(minput.value),
+  a: parseFloat(aInput.value),
+  e: parseFloat(ecc.value),
+  theta0: parseFloat(theta0.value) * Math.PI/180,
+  dt: parseFloat(dtRange.value)
+};
+
+eccVal.textContent = params.e.toFixed(2);
+dtVal.textContent = params.dt.toFixed(2);
+
+/* atualiza params quando inputs mudam */
+[Ginput,Minput,minput,aInput,ecc,theta0,dtRange].forEach(el=>{
+  el.addEventListener('input', ()=>{
+    params.G = parseFloat(Ginput.value);
+    params.M = parseFloat(Minput.value);
+    params.m = parseFloat(minput.value);
+    params.a = parseFloat(aInput.value);
+    params.e = parseFloat(ecc.value);
+    params.theta0 = parseFloat(theta0.value)*Math.PI/180;
+    params.dt = parseFloat(dtRange.value);
+    eccVal.textContent = params.e.toFixed(2);
+    dtVal.textContent = params.dt.toFixed(2);
+    syncStats();
+    // If simulation reset needed, leave to user via Reset
+  });
+});
+
+/* ---------- Physics: initial geometry (ellipse) ---------- */
+/*
+  For an ellipse with semi-major a and eccentricity e:
+  - distance(r) as function of true anomaly theta: r = a*(1 - e^2) / (1 + e*cos(theta))
+  We'll place central mass at origin (focus at x = -a*e, but easier: place focus at origin so ellipse center offset).
+  To get velocities we use vis-viva equation: v^2 = GM(2/r - 1/a)
+  And direction: perpendicular to radius for initial true anomaly.
+*/
+
+let state = {
+  t:0,
+  pos: vec(0,0),
+  vel: vec(0,0),
+  acc: vec(0,0),
+  trace: [],
+  running: false,
+  lastAreaTime: 0,
+  areaSegments: []
+};
+
+function initState(){
+  // compute initial position r0 for given theta0, given focus at origin
+  const a = params.a;
+  const e = params.e;
+  const theta = params.theta0;
+  const p = a * (1 - e*e);
+  const r = p / (1 + e * Math.cos(theta)); // polar eq
+  // polar -> cartesian
+  // We'll interpret polar theta measured from +x axis
+  const x = r * Math.cos(theta);
+  const y = r * Math.sin(theta);
+  // velocity magnitude from vis-viva
+  const mu = params.G * params.M; // GM simplified since m small
+  const v2 = Math.max(0, mu * (2/r - 1/a));
+  const v = Math.sqrt(v2);
+  // direction perpendicular to radius (prograde): rotate by +90deg
+  const dir = {x:-Math.sin(theta), y:Math.cos(theta)}; // unit perp
+  // sign of velocity should be chosen to give bound orbit; vis-viva ensures magnitude.
+  state.pos = vec(x,y);
+  state.vel = mul(dir, v);
+  state.acc = vec(0,0);
+  state.t = 0;
+  state.trace = [];
+  state.running = false;
+  state.lastAreaTime = 0;
+  state.areaSegments = [];
+  syncStats();
+}
+
+/* ---------- Force calculation ---------- */
+function computeForce(pos){
+  // central mass at origin
+  const rvec = sub({x:0,y:0}, pos);
+  const r = len(rvec);
+  const eps = 1e-6;
+  const rSafe = Math.max(r, eps);
+  const Fmag = params.G * params.M * params.m / (rSafe*rSafe);
+  const Fr = mul(norm(rvec), Fmag);
+  return {F: Fr, r: r};
+}
+
+/* ---------- Integration: Velocity Verlet ---------- */
+function step(dt){
+  // a(t)
+  const {F,r} = computeForce(state.pos);
+  const aNow = mul(F, 1/params.m);
+  // x(t+dt) = x + v*dt + 0.5*a*dt^2
+  const xNew = add(state.pos, add(mul(state.vel, dt), mul(aNow, 0.5*dt*dt)));
+  // a(t+dt)
+  const {F: F2, r: r2} = computeForce(xNew);
+  const aNew = mul(F2, 1/params.m);
+  // v(t+dt) = v + 0.5*(a + aNew)*dt
+  const vNew = add(state.vel, mul(add(aNow, aNew), 0.5*dt));
+  // assign
+  state.pos = xNew;
+  state.vel = vNew;
+  state.acc = aNew;
+  state.t += dt;
+  // record trace
+  if(traceSel.value !== 'off'){
+    state.trace.push({x: state.pos.x, y: state.pos.y});
+    if(state.trace.length > 8000) state.trace.shift();
+  }
+  // area segment for Kepler's 2nd law visualization:
+  if(state.t - state.lastAreaTime >= 1.0){ // capture area swept each ~1 simulation time unit (not physical)
+    // simplify: area of triangle (r_prev, r_now) relative to origin
+    const prev = state.trace[state.trace.length-2] || state.pos;
+    const aTri = Math.abs((prev.x*state.pos.y - prev.y*state.pos.x)/2);
+    state.areaSegments.push(aTri);
+    if(state.areaSegments.length > 60) state.areaSegments.shift();
+    state.lastAreaTime = state.t;
+  }
+  return {Fmag: len(F), vmag: len(vNew), r: r2};
+}
+
+/* ---------- Draw ---------- */
+function worldToScreen(p, view){
+  return {
+    x: canvas.clientWidth/2 + (p.x - view.x)*view.scale,
+    y: canvas.clientHeight/2 + (p.y - view.y)*view.scale
+  };
+}
+function draw(){
+  // view parameters (simple pan/zoom)
+  const view = currentView;
+
+  // background depending on trace mode
+  if(traceSel.value === 'fade'){
+    ctx.fillStyle = "rgba(3,7,20,0.12)";
+    ctx.fillRect(0,0,canvas.clientWidth,canvas.clientHeight);
+  } else {
+    ctx.fillStyle = '#031125';
+    ctx.fillRect(0,0,canvas.clientWidth,canvas.clientHeight);
+  }
+
+  // draw central mass (origin)
+  const originScreen = worldToScreen({x:0,y:0}, view);
+  ctx.beginPath();
+  ctx.fillStyle = "#fefefe";
+  ctx.globalAlpha = 1.0;
+  ctx.arc(originScreen.x, originScreen.y, Math.max(4, 6*view.scale/40), 0, Math.PI*2);
+  ctx.fill();
+
+  // draw trace
+  if(state.trace.length > 1 && traceSel.value !== 'off'){
+    ctx.beginPath();
+    for(let i=0;i<state.trace.length;i++){
+      const p = state.trace[i];
+      const s = worldToScreen(p, view);
+      if(i===0) ctx.moveTo(s.x,s.y);
+      else ctx.lineTo(s.x,s.y);
+    }
+    ctx.strokeStyle = "#7dd3fc";
+    ctx.globalAlpha = (traceSel.value === 'fade') ? 0.35 : 0.9;
+    ctx.lineWidth = Math.max(1, 1.5*view.scale/40);
+    ctx.stroke();
+  }
+
+  // draw orbit ellipse approximate (analytical) for reference
+  drawAnalyticalEllipse(view);
+
+  // draw body
+  const bodyScreen = worldToScreen(state.pos, view);
+  ctx.beginPath();
+  ctx.fillStyle = "#ffb86b";
+  ctx.globalAlpha = 1.0;
+  ctx.arc(bodyScreen.x, bodyScreen.y, Math.max(3, 5*view.scale/40), 0, Math.PI*2);
+  ctx.fill();
+
+  // draw radial line
+  ctx.beginPath();
+  ctx.moveTo(originScreen.x, originScreen.y);
+  ctx.lineTo(bodyScreen.x, bodyScreen.y);
+  ctx.strokeStyle = "rgba(255,255,255,0.06)";
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // draw arrow for velocity
+  drawArrow(bodyScreen, add(bodyScreen, mul(state.vel, view.scale*0.2)), "#a7f3d0");
+
+  // draw small area bars for Kepler 2 visualization
+  drawAreaBars(view);
+
+  // HUD small stats
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = "rgba(255,255,255,0.02)";
+  ctx.fillRect(10,10,230,78);
+  ctx.fillStyle = "#e6eef8";
+  ctx.font = "12px Inter, sans-serif";
+  ctx.fillText("t = " + state.t.toFixed(2), 20, 30);
+  ctx.fillText("r = " + len(state.pos).toFixed(2), 20, 48);
+  ctx.fillText("v = " + len(state.vel).toFixed(2), 20, 66);
+}
+
+/* helpers */
+function drawArrow(from, to, color="#fff"){
+  ctx.beginPath();
+  ctx.moveTo(from.x,from.y);
+  ctx.lineTo(to.x,to.y);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  // arrow head
+  const ang = Math.atan2(to.y-from.y,to.x-from.x);
+  ctx.beginPath();
+  const s = 8;
+  ctx.moveTo(to.x,to.y);
+  ctx.lineTo(to.x - s*Math.cos(ang-0.4), to.y - s*Math.sin(ang-0.4));
+  ctx.lineTo(to.x - s*Math.cos(ang+0.4), to.y - s*Math.sin(ang+0.4));
+  ctx.closePath();
+  ctx.fillStyle = color;
+  ctx.fill();
+}
+
+function drawAnalyticalEllipse(view){
+  // draw full ellipse from analytic parameters (focus at origin)
+  const a = params.a;
+  const e = params.e;
+  const b = a * Math.sqrt(1 - e*e);
+  // ellipse center is at cx = -a*e (so focus at origin)
+  const cx = -a*e;
+  ctx.beginPath();
+  const steps = 220;
+  for(let i=0;i<=steps;i++){
+    const ang = i / steps * Math.PI*2;
+    // param eq ellipse centered at (cx,0) oriented along x
+    // using param t: x = cx + a*cos(t), y = b*sin(t)
+    const x = cx + a*Math.cos(ang);
+    const y = b*Math.sin(ang);
+    const s = worldToScreen({x,y}, view);
+    if(i===0) ctx.moveTo(s.x,s.y); else ctx.lineTo(s.x,s.y);
+  }
+  ctx.strokeStyle = "rgba(255,255,255,0.06)";
+  ctx.lineWidth = 1;
+  ctx.stroke();
+}
+
+/* draw area bars to illustrate Kepler 2 */
+function drawAreaBars(view){
+  const baseX = 10;
+  const baseY = canvas.clientHeight - 40;
+  ctx.font = "11px Inter, sans-serif";
+  ctx.fillStyle = "rgba(255,255,255,0.08)";
+  ctx.fillRect(baseX-6, baseY-26, 250, 30);
+  ctx.fillStyle = "#e6eef8";
+  ctx.fillText("Áreas (amostras recentes) — Kepler 2", baseX, baseY-6);
+  const bars = state.areaSegments.slice(-12);
+  const max = Math.max(...bars, 1e-6);
+  for(let i=0;i<bars.length;i++){
+    const w = 14;
+    const h = Math.max(2, (bars[i]/max) * 18);
+    ctx.fillStyle = "rgba(125,211,252,0.6)";
+    ctx.fillRect(baseX + i*(w+4), baseY - h, w, h);
+  }
+}
+
+/* ---------- View (pan/zoom) ---------- */
+let currentView = {x:0,y:0,scale:1};
+let isDragging=false,lastDrag=null;
+canvas.addEventListener('pointerdown', (e)=>{
+  isDragging=true; lastDrag={x:e.clientX,y:e.clientY};
+  canvas.setPointerCapture(e.pointerId);
+});
+canvas.addEventListener('pointerup', (e)=>{
+  isDragging=false; lastDrag=null;
+});
+canvas.addEventListener('pointermove', (e)=>{
+  if(!isDragging) return;
+  const dx = (e.clientX - lastDrag.x)/currentView.scale;
+  const dy = (e.clientY - lastDrag.y)/currentView.scale;
+  currentView.x -= dx;
+  currentView.y -= dy;
+  lastDrag = {x:e.clientX,y:e.clientY};
+});
+canvas.addEventListener('wheel', (ev)=>{
+  ev.preventDefault();
+  const s = Math.exp(-ev.deltaY*0.0012);
+  currentView.scale *= s;
+  currentView.scale = Math.max(0.05, Math.min(5, currentView.scale));
+});
+
+/* pinch zoom (basic) */
+let lastTouches = null;
+canvas.addEventListener('touchstart', (e)=>{
+  if(e.touches.length===2){
+    lastTouches = [...e.touches].map(t=>({x:t.clientX,y:t.clientY}));
+  }
+}, {passive:false});
+canvas.addEventListener('touchmove', (e)=>{
+  if(e.touches.length===2 && lastTouches){
+    const t0 = e.touches[0], t1 = e.touches[1];
+    const d0 = Math.hypot(t0.clientX-t1.clientX, t0.clientY-t1.clientY);
+    const ld = Math.hypot(lastTouches[0].x-lastTouches[1].x, lastTouches[0].y-lastTouches[1].y);
+    const factor = d0/ld;
+    currentView.scale *= factor;
+    currentView.scale = Math.max(0.05, Math.min(5, currentView.scale));
+    lastTouches = [...e.touches].map(t=>({x:t.clientX,y:t.clientY}));
+    e.preventDefault();
+  }
+}, {passive:false});
+
+/* ---------- Animation loop ---------- */
+let raf = null;
+function animate(){
+  if(state.running){
+    // integrate several small steps to keep smoothness independent of frame rate
+    const dt = params.dt;
+    const maxSteps = 8;
+    const steps = 1; // small, user controls dt; can increase if desired
+    let Fmag=0, vmag=0, rnow=0;
+    for(let i=0;i<steps;i++){
+      const res = step(dt/steps);
+      Fmag = res.Fmag; vmag = res.vmag; rnow = res.r;
+    }
+    // update displayed stats
+    statF.textContent = Fmag.toFixed(3);
+    statV.textContent = vmag.toFixed(3);
+    const energy = 0.5*params.m*(len(state.vel)**2) - params.G*params.M*params.m/Math.max(1e-6, len(state.pos));
+    statE.textContent = energy.toFixed(3);
+  }
+  draw();
+  // update textual infos
+  info1.textContent = "t = " + state.t.toFixed(2);
+  info2.textContent = "area (last) = " + (state.areaSegments[state.areaSegments.length-1] || 0).toFixed(3);
+  // compute period approximations
+  estimatePeriod();
+  raf = requestAnimationFrame(animate);
+}
+animate();
+
+/* ---------- Period estimation: numeric detection of return to periapsis ---------- */
+let lastPeriTime = null;
+function estimatePeriod(){
+  // heuristic: detect sign change of radial velocity across periapsis (minimum r)
+  // store last few r and t to detect local minima
+  if(!state.trace || state.trace.length < 10) return;
+  // compute last 9 r values
+  const tail = state.trace.slice(-9).map(p=>({r:Math.hypot(p.x,p.y)}));
+  const rvals = tail.map(x=>x.r);
+  // check if middle element is a local min
+  const mid = Math.floor(rvals.length/2);
+  if(rvals[mid] < rvals[mid-1] && rvals[mid] < rvals[mid+1]){
+    const now = state.t;
+    if(lastPeriTime && (now - lastPeriTime) > 1e-6){
+      const Tnum = now - lastPeriTime;
+      periodNum.textContent = Tnum.toFixed(3);
+    }
+    lastPeriTime = now;
+  }
+  // Kepler (analytic): T = 2*pi*sqrt(a^3 / (G*M))
+  const Tkepler = 2*Math.PI*Math.sqrt(Math.abs(params.a**3/(params.G*params.M)));
+  periodK.textContent = Tkepler.toFixed(3);
+}
+
+/* ---------- Controls: Start/Pause/Reset ---------- */
+startBtn.addEventListener('click', ()=>{
+  state.running = true;
+});
+pauseBtn.addEventListener('click', ()=>{
+  state.running = false;
+});
+resetBtn.addEventListener('click', ()=>{
+  initState();
+  // reset view and trace
+  state.trace = [];
+  currentView = {x:0,y:0,scale:1};
+  lastPeriTime = null;
+});
+
+/* update small UI */
+function syncStats(){
+  statM.textContent = params.M;
+  statm.textContent = params.m;
+}
+syncStats();
+initState();
+
+/* ---------- Analytical ellipse drawing uses a,b from params; but center offset handled earlier ---------- */
+
+/* ---------- Utility: draw initial orbit indicator on load ---------- */
+// nothing extra
+
+/* ---------- Extra: allow clicking to set initial angle ---------- */
+canvas.addEventListener('dblclick', (e)=>{
+  // set theta0 based on click pos relative to canvas center & update initial state
+  const rect = canvas.getBoundingClientRect();
+  const cx = rect.left + rect.width/2;
+  const cy = rect.top + rect.height/2;
+  const x = (e.clientX - cx)/currentView.scale + currentView.x;
+  const y = (e.clientY - cy)/currentView.scale + currentView.y;
+  const theta = Math.atan2(y,x);
+  theta0.value = (theta*180/Math.PI).toFixed(1);
+  params.theta0 = theta;
+  initState();
+});
+
+/* ---------- Accessibility and keyboard shortcuts ---------- */
+window.addEventListener('keydown', (e)=>{
+  if(e.code === 'Space'){ state.running = !state.running; e.preventDefault();}
+  if(e.code === 'KeyR') initState();
+});
+
+/* ---------- Initial draw fill ---------- */
+draw();
+
+/* ---------- Notes for user embedded in console for debugging ---------- */
+console.log("Simulação carregada. Dicas:\n- Ajuste 'a' e 'e' e clique Reset para ver nova órbita.\n- Double-click no canvas define anomalia inicial.\n- Space para start/pause, R para reset.");
+</script>
+</body>
+</html>
